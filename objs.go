@@ -15,4 +15,5 @@ type ObjDevice struct{
 	description string
 	devices_addresses string
 	addresses [] ObjAddress
+	text_log [] string
 }

@@ -13,14 +13,7 @@ import (
     "strconv"
 )
 
-var (
-    device      string = "eth0"
-    snapshotLen int32  = 1024
-    promiscuous bool   = false
-    err         error
-    timeout     time.Duration = 5 * time.Second
-    handle      *pcap.Handle
-)
+
 
 
 var lst_devices [] ObjDevice
@@ -68,14 +61,87 @@ func find_devices(){
     }
 }
 
-func live_capture(){
+func start_live_capture(){
+    for n := range lst_devices {
+        go live_capture(n,lst_devices[n].name)       
+    }
+}
+
+func live_capture(num int,dev string){
+    var (
+        device      string = dev
+        snapshotLen int32  = 1024
+        promiscuous bool   = false
+        err         error
+        timeout     time.Duration = 5 * time.Second
+        handle      *pcap.Handle
+    )
+
     handle, err = pcap.OpenLive(device, snapshotLen, promiscuous, timeout)
     if err != nil {log.Fatal(err) }
     defer handle.Close()
 
     packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
     for packet := range packetSource.Packets() {
-        printPacketInfo(packet)
+        //printPacketInfo(packet)
+        saveTextPacketInfo(num,packet)
+    }
+}
+
+
+func saveTextPacketInfo(num int,packet gopacket.Packet) {
+    // Let's see if the packet is an ethernet packet
+    ethernetLayer := packet.Layer(layers.LayerTypeEthernet)
+    if ethernetLayer != nil {
+        
+        lst_devices[num].text_log = append(lst_devices[num].text_log,"Ethernet layer detected.")
+        ethernetPacket, _ := ethernetLayer.(*layers.Ethernet)
+        lst_devices[num].text_log = append(lst_devices[num].text_log,"Source MAC: " + ethernetPacket.SrcMAC.String())
+        lst_devices[num].text_log = append(lst_devices[num].text_log,"Destination MAC: " + ethernetPacket.DstMAC.String())
+        lst_devices[num].text_log = append(lst_devices[num].text_log,"Ethernet type: " + ethernetPacket.EthernetType.String())
+    }
+
+    // Let's see if the packet is IP (even though the ether type told us)
+    ipLayer := packet.Layer(layers.LayerTypeIPv4)
+    if ipLayer != nil {
+        lst_devices[num].text_log = append(lst_devices[num].text_log,"IPv4 layer detected.")
+        ip, _ := ipLayer.(*layers.IPv4)
+        lst_devices[num].text_log = append(lst_devices[num].text_log,"From" + ip.SrcIP.String() + " to " +  ip.DstIP.String())
+        lst_devices[num].text_log = append(lst_devices[num].text_log,"Protocol: " + ip.Protocol.String())
+    }
+
+    // Let's see if the packet is TCP
+    tcpLayer := packet.Layer(layers.LayerTypeTCP)
+    if tcpLayer != nil {
+        lst_devices[num].text_log = append(lst_devices[num].text_log,"TCP layer detected.")
+        tcp, _ := tcpLayer.(*layers.TCP)
+        lst_devices[num].text_log = append(lst_devices[num].text_log,"From port " + tcp.SrcPort.String() + " to " + tcp.DstPort.String())
+        tcpseq := strconv.Itoa(int(tcp.Seq))
+        lst_devices[num].text_log = append(lst_devices[num].text_log,"Sequence number: " + tcpseq)
+    }
+
+    // Iterate over all layers, printing out each layer type
+    lst_devices[num].text_log = append(lst_devices[num].text_log,"All packet layers:")
+    for _, layer := range packet.Layers() {
+        lst_devices[num].text_log = append(lst_devices[num].text_log, "- " + layer.LayerType().String())
+    }
+
+    // When iterating through packet.Layers() above,
+    // if it lists Payload layer then that is the same as
+    // this applicationLayer. applicationLayer contains the payload
+    applicationLayer := packet.ApplicationLayer()
+    if applicationLayer != nil {
+        lst_devices[num].text_log = append(lst_devices[num].text_log,"Application layer/Payload found.")
+        paydata := string(applicationLayer.Payload())
+        lst_devices[num].text_log = append(lst_devices[num].text_log,paydata)
+        if strings.Contains(string(applicationLayer.Payload()), "HTTP") {
+            //fmt.Println("HTTP found!")
+        }
+    }
+
+    // Check for errors
+    if err := packet.ErrorLayer(); err != nil {
+        fmt.Println("Error decoding some part of the packet:", err)
     }
 }
 

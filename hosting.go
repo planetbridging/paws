@@ -56,34 +56,23 @@ func get_devices() string{
         tbl += `<div class='dropdown-divider'></div>
         <a class="dropdown-item" onclick="Select_Device('/dev/`+num+`')">
         <table class='table table-dark'>
-        <thead>
-          <tr>
-            <th colspan='2'>`+num+`</th>
-          </tr>
-        </thead>
         <tbody>
           <tr>
+            <td></td>
             <td>Name:</td>
             <td>`+lst_devices[d].name+`</td>
           </tr>
           <tr>
+            <td></td>
             <td>description:</td>
             <td>`+lst_devices[d].description+`</td>
-          </tr>
-          <tr>
-            <td>devices addresses:</td>
-            <td>`+lst_devices[d].devices_addresses+`</td>
           </tr>`
         
         for a := range lst_devices[d].addresses {
             tbl += `<tr>
+            <td></td>
             <td>ip:</td>
             <td>`+lst_devices[d].addresses[a].ip.String()+`</td>
-            </tr>`
-
-            tbl += `<tr>
-            <td>subnet:</td>
-            <td>`+lst_devices[d].addresses[a].subnet.String()+`</td>
             </tr>`
         }
 
